@@ -1,0 +1,448 @@
+syntax = "proto3";
+package table_grouppb;
+
+import "gogoproto/gogo.proto";
+import "metapb.proto";
+import "rustproto.proto";
+
+option java_package = "org.tikv.kvproto";
+option (gogoproto.goproto_sizecache_all) = false;
+option (gogoproto.goproto_unkeyed_all) = false;
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (rustproto.lite_runtime_all) = true;
+
+// TableGroupService manages the authoritative lifecycle of a Table Group.
+// Implementations must apply every mutation with metadata-version compare-and-swap
+// and operation-token idempotency.
+service TableGroupService {
+  rpc CreateTableGroup(CreateTableGroupRequest) returns (CreateTableGroupResponse) {}
+  rpc GetTableGroup(GetTableGroupRequest) returns (GetTableGroupResponse) {}
+  rpc GetTableGroupByRegion(GetTableGroupByRegionRequest) returns (GetTableGroupByRegionResponse) {}
+  rpc PrepareMembership(PrepareMembershipRequest) returns (PrepareMembershipResponse) {}
+  rpc CommitMembership(CommitMembershipRequest) returns (CommitMembershipResponse) {}
+  rpc AbortMembership(AbortMembershipRequest) returns (AbortMembershipResponse) {}
+}
+
+// RequestHeader identifies the cluster and caller of a Table Group request.
+// It is local to this package so PD and scheduling protos can later import
+// Table Group errors without creating a protobuf import cycle.
+message RequestHeader {
+  // cluster_id is the target cluster ID.
+  uint64 cluster_id = 1;
+  // sender_id is the sender's server or member ID when one exists.
+  uint64 sender_id = 2;
+  // caller_id identifies the client instance.
+  string caller_id = 3;
+  // caller_component identifies the client subsystem.
+  string caller_component = 4;
+}
+
+// ResponseHeader carries the responding cluster and a deterministic domain error.
+// A missing error or TABLE_GROUP_ERROR_CODE_OK means the request succeeded.
+message ResponseHeader {
+  // cluster_id is the responding cluster ID.
+  uint64 cluster_id = 1;
+  // error describes a Table Group lifecycle or policy failure.
+  TableGroupError error = 2;
+}
+
+// TableGroupIdentity is stable and never reused after allocation.
+message TableGroupIdentity {
+  // keyspace_id scopes the Table Group. Zero is a valid keyspace ID.
+  uint32 keyspace_id = 1;
+  // table_group_id is non-zero and never reused within a cluster.
+  uint64 table_group_id = 2;
+}
+
+// TableGroupState is the authoritative lifecycle state.
+// Unspecified and unknown values are invalid for an activated Table Group.
+enum TableGroupState {
+  TABLE_GROUP_STATE_UNSPECIFIED = 0;
+  // The authority record exists and Region attachment is pending.
+  TABLE_GROUP_STATE_CREATING = 1;
+  // The Region binding is applied and active membership is usable.
+  TABLE_GROUP_STATE_ACTIVE = 2;
+  // A complete next membership is prepared but not yet active.
+  TABLE_GROUP_STATE_UPDATING_MEMBERSHIP = 3;
+  // The group is draining for a future delete operation.
+  TABLE_GROUP_STATE_DELETING = 4;
+  // The identity is permanently retired and must not be reused.
+  TABLE_GROUP_STATE_TOMBSTONE = 5;
+}
+
+// TableGroupOperationKind identifies an idempotent metadata mutation.
+enum TableGroupOperationKind {
+  TABLE_GROUP_OPERATION_KIND_UNSPECIFIED = 0;
+  TABLE_GROUP_OPERATION_KIND_CREATE = 1;
+  TABLE_GROUP_OPERATION_KIND_UPDATE_MEMBERSHIP = 2;
+  TABLE_GROUP_OPERATION_KIND_DELETE = 3;
+}
+
+// TableGroupOperation records the exact in-flight mutation.
+message TableGroupOperation {
+  // token is an opaque, non-empty idempotency token of at most 64 bytes.
+  bytes token = 1;
+  // kind identifies the mutation represented by token.
+  TableGroupOperationKind kind = 2;
+  // base_metadata_version is the compare-and-swap precondition.
+  uint64 base_metadata_version = 3;
+  // target_metadata_version is the version produced by the mutation.
+  uint64 target_metadata_version = 4;
+}
+
+// TableGroupMember owns all row, primary-key, and secondary-index data for one
+// non-partitioned table or one table partition.
+message TableGroupMember {
+  // table_id identifies the logical table and is non-zero.
+  uint64 table_id = 1;
+  // partition_id is zero for a non-partitioned table and non-zero for a partition.
+  uint64 partition_id = 2;
+  // index_ids is the complete, unique, ascending set of secondary-index IDs.
+  repeated uint64 index_ids = 3;
+}
+
+// TableGroupMembership is a complete canonical snapshot, never a patch.
+message TableGroupMembership {
+  // version starts at one for the first active membership and increases by one.
+  uint64 version = 1;
+  // members is unique and ordered by table_id then partition_id.
+  repeated TableGroupMember members = 2;
+}
+
+// TableGroupRegionBinding declares the one Region/Raft Group/Shard owned by a
+// Table Group.
+message TableGroupRegionBinding {
+  // region_id identifies both the Region and its Raft Group.
+  uint64 region_id = 1;
+  // region_epoch is the authoritative epoch expected for the binding.
+  metapb.RegionEpoch region_epoch = 2;
+  // shard_id is the single CSE Shard corresponding to region_id.
+  uint64 shard_id = 3;
+  // applied_metadata_version is the version reported by the Region mirror.
+  uint64 applied_metadata_version = 4;
+}
+
+// SplitPolicyMode controls whether ordinary Region split paths are allowed.
+enum SplitPolicyMode {
+  SPLIT_POLICY_MODE_UNSPECIFIED = 0;
+  // Every automatic, manual, administrative, and replayed split is rejected.
+  SPLIT_POLICY_MODE_FORBID = 1;
+}
+
+// SplitPolicy is versioned with the authoritative Table Group snapshot.
+message SplitPolicy {
+  // mode must be SPLIT_POLICY_MODE_FORBID for a Milestone-1 Table Group.
+  SplitPolicyMode mode = 1;
+}
+
+// SplitSource identifies the path that attempted a split.
+enum SplitSource {
+  SPLIT_SOURCE_UNSPECIFIED = 0;
+  SPLIT_SOURCE_AUTOMATIC_SIZE = 1;
+  SPLIT_SOURCE_AUTOMATIC_KEY_COUNT = 2;
+  SPLIT_SOURCE_AUTOMATIC_LOAD = 3;
+  SPLIT_SOURCE_MANUAL_REQUEST = 4;
+  SPLIT_SOURCE_ADMIN_COMMAND = 5;
+  SPLIT_SOURCE_RECOVERY_REPLAY = 6;
+}
+
+// SplitRejectionReason identifies why the split did not proceed.
+enum SplitRejectionReason {
+  SPLIT_REJECTION_REASON_UNSPECIFIED = 0;
+  SPLIT_REJECTION_REASON_POLICY_FORBIDS_SPLIT = 1;
+  SPLIT_REJECTION_REASON_STALE_METADATA = 2;
+  SPLIT_REJECTION_REASON_REGION_BINDING_MISMATCH = 3;
+  SPLIT_REJECTION_REASON_EXPLICIT_MIGRATION_REQUIRED = 4;
+}
+
+// CapacityLimitAction defines the configured response at a capacity limit.
+enum CapacityLimitAction {
+  CAPACITY_LIMIT_ACTION_UNSPECIFIED = 0;
+  CAPACITY_LIMIT_ACTION_REJECT = 1;
+  CAPACITY_LIMIT_ACTION_THROTTLE = 2;
+}
+
+// CapacityDimension names a bounded, observable capacity resource.
+enum CapacityDimension {
+  CAPACITY_DIMENSION_UNSPECIFIED = 0;
+  CAPACITY_DIMENSION_DATA_BYTES = 1;
+  CAPACITY_DIMENSION_WRITE_BYTES_PER_SECOND = 2;
+  CAPACITY_DIMENSION_REQUESTS_PER_SECOND = 3;
+  CAPACITY_DIMENSION_RAFT_LOG_BYTES = 4;
+  CAPACITY_DIMENSION_SNAPSHOT_BYTES = 5;
+  CAPACITY_DIMENSION_RECOVERY_SECONDS = 6;
+}
+
+// CapacityState reports whether an unsplittable Region can admit growth.
+enum CapacityState {
+  CAPACITY_STATE_UNSPECIFIED = 0;
+  CAPACITY_STATE_HEALTHY = 1;
+  CAPACITY_STATE_APPROACHING_LIMIT = 2;
+  CAPACITY_STATE_THROTTLED = 3;
+  CAPACITY_STATE_EXHAUSTED = 4;
+  // Unknown is fail-closed and is not equivalent to healthy capacity.
+  CAPACITY_STATE_UNKNOWN = 5;
+}
+
+// CapacityBudget defines finite limits for an unsplittable Table Group Region.
+message CapacityBudget {
+  // max_data_bytes bounds total persisted user and index data.
+  uint64 max_data_bytes = 1;
+  // max_write_bytes_per_second bounds sustained logical write throughput.
+  uint64 max_write_bytes_per_second = 2;
+  // max_requests_per_second bounds sustained read and write request rate.
+  uint64 max_requests_per_second = 3;
+  // max_raft_log_bytes bounds retained Raft log data.
+  uint64 max_raft_log_bytes = 4;
+  // max_snapshot_bytes bounds one generated or restored snapshot.
+  uint64 max_snapshot_bytes = 5;
+  // max_recovery_seconds bounds the projected recovery duration.
+  uint64 max_recovery_seconds = 6;
+  // limit_action is the mandatory behavior when a limit is reached.
+  CapacityLimitAction limit_action = 7;
+}
+
+// CapacityUsage is a point-in-time measurement in the same units as CapacityBudget.
+message CapacityUsage {
+  // data_bytes is total persisted user and index data.
+  uint64 data_bytes = 1;
+  // write_bytes_per_second is observed logical write throughput.
+  uint64 write_bytes_per_second = 2;
+  // requests_per_second is observed read and write request rate.
+  uint64 requests_per_second = 3;
+  // raft_log_bytes is retained Raft log data.
+  uint64 raft_log_bytes = 4;
+  // snapshot_bytes is the latest relevant snapshot size.
+  uint64 snapshot_bytes = 5;
+  // recovery_seconds is the latest measured or projected recovery duration.
+  uint64 recovery_seconds = 6;
+}
+
+// CapacityStatus reports measured usage and every limiting dimension.
+message CapacityStatus {
+  CapacityState state = 1;
+  CapacityUsage usage = 2;
+  // limiting_dimensions contains unique, ascending enum values.
+  repeated CapacityDimension limiting_dimensions = 3;
+  // observed_at_unix_millis is the authority's observation wall-clock time.
+  uint64 observed_at_unix_millis = 4;
+}
+
+// PlacementConstraintOperator defines a label predicate.
+enum PlacementConstraintOperator {
+  PLACEMENT_CONSTRAINT_OPERATOR_UNSPECIFIED = 0;
+  PLACEMENT_CONSTRAINT_OPERATOR_IN = 1;
+  PLACEMENT_CONSTRAINT_OPERATOR_NOT_IN = 2;
+  PLACEMENT_CONSTRAINT_OPERATOR_EXISTS = 3;
+  PLACEMENT_CONSTRAINT_OPERATOR_NOT_EXISTS = 4;
+}
+
+// PlacementConstraint is a bounded predicate over store labels.
+message PlacementConstraint {
+  // key is a store label key and is compared case-insensitively by placement policy.
+  string key = 1;
+  // operator determines how values are evaluated.
+  PlacementConstraintOperator operator = 2;
+  // values is empty for EXISTS/NOT_EXISTS and non-empty for IN/NOT_IN.
+  repeated string values = 3;
+}
+
+// PlacementIntent declares desired replica and leader placement. Current peers
+// and the current leader remain in existing Region metadata.
+message PlacementIntent {
+  // replica_count is the desired total number of Region peers.
+  uint32 replica_count = 1;
+  // location_labels is ordered from the largest to smallest failure domain.
+  repeated string location_labels = 2;
+  // replica_constraints apply to every selected peer store.
+  repeated PlacementConstraint replica_constraints = 3;
+  // leader_constraints apply in addition when selecting the leader store.
+  repeated PlacementConstraint leader_constraints = 4;
+}
+
+// TableGroup is a complete authoritative snapshot with independent spec and
+// observed-status versions.
+message TableGroup {
+  // identity is immutable for the lifetime of the group.
+  TableGroupIdentity identity = 1;
+  // metadata_version is non-zero and advances on every successful identity,
+  // lifecycle, membership, binding-spec, policy, budget, or placement mutation.
+  uint64 metadata_version = 2;
+  // state is the metadata-versioned lifecycle state.
+  TableGroupState state = 3;
+  // active_membership is the only membership visible to consumers.
+  TableGroupMembership active_membership = 4;
+  // prepared_membership is visible only to reconciliation while updating.
+  TableGroupMembership prepared_membership = 5;
+  // pending_operation is present only for a retryable in-flight mutation.
+  TableGroupOperation pending_operation = 6;
+  // region_binding contains metadata-versioned binding spec and status-versioned
+  // applied progress as documented on its fields.
+  TableGroupRegionBinding region_binding = 7;
+  // split_policy is metadata-versioned policy spec.
+  SplitPolicy split_policy = 8;
+  // capacity_budget is metadata-versioned admission policy spec.
+  CapacityBudget capacity_budget = 9;
+  // capacity_status and region_binding.applied_metadata_version are observed
+  // status governed by status_version, not metadata_version.
+  CapacityStatus capacity_status = 10;
+  // placement_intent is metadata-versioned desired placement spec.
+  PlacementIntent placement_intent = 11;
+  // status_version is non-zero and advances when observed applied metadata or
+  // capacity status changes. Status updates do not invalidate metadata CAS.
+  uint64 status_version = 12;
+}
+
+// TableGroupErrorCode is stable and determines caller retry behavior.
+enum TableGroupErrorCode {
+  TABLE_GROUP_ERROR_CODE_OK = 0;
+  TABLE_GROUP_ERROR_CODE_UNKNOWN = 1;
+  TABLE_GROUP_ERROR_CODE_NOT_FOUND = 2;
+  TABLE_GROUP_ERROR_CODE_ALREADY_EXISTS = 3;
+  TABLE_GROUP_ERROR_CODE_INVALID_ARGUMENT = 4;
+  TABLE_GROUP_ERROR_CODE_STALE_METADATA_VERSION = 5;
+  TABLE_GROUP_ERROR_CODE_OPERATION_CONFLICT = 6;
+  TABLE_GROUP_ERROR_CODE_INVALID_STATE = 7;
+  TABLE_GROUP_ERROR_CODE_KEYSPACE_MISMATCH = 8;
+  TABLE_GROUP_ERROR_CODE_REGION_MISMATCH = 9;
+  TABLE_GROUP_ERROR_CODE_EPOCH_MISMATCH = 10;
+  TABLE_GROUP_ERROR_CODE_MEMBERSHIP_CONFLICT = 11;
+  TABLE_GROUP_ERROR_CODE_SPLIT_FORBIDDEN = 12;
+  TABLE_GROUP_ERROR_CODE_CAPACITY_EXCEEDED = 13;
+  TABLE_GROUP_ERROR_CODE_CAPACITY_UNKNOWN = 14;
+  TABLE_GROUP_ERROR_CODE_INTERNAL = 15;
+}
+
+// TableGroupError carries stable machine-readable context. Callers must not
+// branch on the diagnostic message text.
+message TableGroupError {
+  // code determines retry or terminal handling.
+  TableGroupErrorCode code = 1;
+  // message is diagnostic only and must not drive program behavior.
+  string message = 2;
+  // identity is present when the failure can be attributed to one group.
+  TableGroupIdentity identity = 3;
+  // expected_metadata_version is the request's compare-and-swap precondition.
+  uint64 expected_metadata_version = 4;
+  // actual_metadata_version is the version observed by the authority.
+  uint64 actual_metadata_version = 5;
+  // operation_token identifies the mutation being reconciled.
+  bytes operation_token = 6;
+  // split_source is set for split-policy failures.
+  SplitSource split_source = 7;
+  // split_rejection_reason is set for split-policy failures.
+  SplitRejectionReason split_rejection_reason = 8;
+  // capacity_dimensions lists every dimension responsible for capacity failure.
+  repeated CapacityDimension capacity_dimensions = 9;
+}
+
+// CreateTableGroupRequest creates or replays creation of one stable Table Group.
+message CreateTableGroupRequest {
+  // header identifies the cluster and caller.
+  RequestHeader header = 1;
+  // keyspace_id is the dedicated keyspace that will own the group.
+  uint32 keyspace_id = 2;
+  // requested_table_group_id is zero when the authority should allocate an ID.
+  uint64 requested_table_group_id = 3;
+  // region_binding selects the one Region/Raft Group/Shard boundary.
+  TableGroupRegionBinding region_binding = 4;
+  // split_policy must forbid split for Milestone-1 groups.
+  SplitPolicy split_policy = 5;
+  // capacity_budget must provide every required finite limit.
+  CapacityBudget capacity_budget = 6;
+  // placement_intent declares desired peer and leader placement.
+  PlacementIntent placement_intent = 7;
+  // operation_token makes create retries idempotent.
+  bytes operation_token = 8;
+}
+
+// CreateTableGroupResponse returns the created or idempotently replayed snapshot.
+message CreateTableGroupResponse {
+  ResponseHeader header = 1;
+  TableGroup table_group = 2;
+}
+
+// GetTableGroupRequest loads one group by its complete identity.
+message GetTableGroupRequest {
+  RequestHeader header = 1;
+  TableGroupIdentity identity = 2;
+}
+
+// GetTableGroupResponse returns the current spec and observed-status snapshot.
+message GetTableGroupResponse {
+  ResponseHeader header = 1;
+  TableGroup table_group = 2;
+}
+
+// GetTableGroupByRegionRequest resolves the authority record before a Region
+// has a durable Table Group mirror. keyspace_id is an explicit tenant-boundary
+// check; region_id is the globally unique lookup key.
+message GetTableGroupByRegionRequest {
+  RequestHeader header = 1;
+  uint32 keyspace_id = 2;
+  uint64 region_id = 3;
+}
+
+// GetTableGroupByRegionResponse returns the current authority snapshot bound
+// to the requested Region and keyspace.
+message GetTableGroupByRegionResponse {
+  ResponseHeader header = 1;
+  TableGroup table_group = 2;
+}
+
+// PrepareMembershipRequest stores a complete next membership without making it active.
+message PrepareMembershipRequest {
+  RequestHeader header = 1;
+  TableGroupIdentity identity = 2;
+  // expected_metadata_version is the active snapshot CAS precondition.
+  uint64 expected_metadata_version = 3;
+  // proposed_membership is the complete canonical next snapshot.
+  TableGroupMembership proposed_membership = 4;
+  // operation_token makes prepare retries idempotent.
+  bytes operation_token = 5;
+}
+
+// PrepareMembershipResponse returns active and prepared membership snapshots.
+message PrepareMembershipResponse {
+  ResponseHeader header = 1;
+  TableGroup table_group = 2;
+}
+
+// CommitMembershipRequest atomically publishes the matching prepared membership.
+message CommitMembershipRequest {
+  RequestHeader header = 1;
+  TableGroupIdentity identity = 2;
+  // expected_metadata_version is the prepared snapshot CAS precondition.
+  uint64 expected_metadata_version = 3;
+  // membership_version must match the prepared membership.
+  uint64 membership_version = 4;
+  // operation_token must match the prepared operation.
+  bytes operation_token = 5;
+}
+
+// CommitMembershipResponse returns the newly active membership snapshot.
+message CommitMembershipResponse {
+  ResponseHeader header = 1;
+  TableGroup table_group = 2;
+}
+
+// AbortMembershipRequest discards only the matching prepared membership.
+message AbortMembershipRequest {
+  RequestHeader header = 1;
+  TableGroupIdentity identity = 2;
+  // expected_metadata_version is the prepared snapshot CAS precondition.
+  uint64 expected_metadata_version = 3;
+  // membership_version must match the prepared membership.
+  uint64 membership_version = 4;
+  // operation_token must match the prepared operation.
+  bytes operation_token = 5;
+}
+
+// AbortMembershipResponse returns the unchanged active membership snapshot.
+message AbortMembershipResponse {
+  ResponseHeader header = 1;
+  TableGroup table_group = 2;
+}

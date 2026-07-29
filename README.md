@@ -46,3 +46,9 @@ If you change backup metadata wire schema in `proto/brpb.proto` (for
 `backup.BackupMeta` or messages reachable from it), increment
 `BackupSchemaVersion` in
 `pkg/brpb/backup_schema_version.go`.
+
+# Table Group Protocol
+
+The Table Group lifecycle, Region mirror, compatibility defaults, field-number
+policy, and consumer validation rules are documented in
+[docs/table-group-protocol.md](docs/table-group-protocol.md).

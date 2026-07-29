@@ -119,6 +119,21 @@ message BucketMeta {
   repeated bytes keys = 2;
 }
 
+// TableGroupRegionMeta identifies the Table Group metadata applied to a Region.
+// The enclosing Region is an ordinary, splittable Region when this message is absent.
+// Consumers must fail closed when this message is present but incomplete or conflicts
+// with the authoritative Table Group record.
+message TableGroupRegionMeta {
+  // keyspace_id is part of the immutable Table Group identity. Zero is a valid
+  // keyspace ID and does not indicate absence by itself.
+  uint32 keyspace_id = 1;
+  // table_group_id is non-zero and never reused within a cluster.
+  uint64 table_group_id = 2;
+  // applied_metadata_version is the authoritative Table Group metadata version
+  // durably applied by this Region. It is non-zero and monotonically increasing.
+  uint64 applied_metadata_version = 3;
+}
+
 message Region {
   uint64 id = 1;
   // Region key range [start_key, end_key).
@@ -136,6 +151,9 @@ message Region {
   bool is_in_flashback = 7;
   // The start_ts that the current flashback progress is using.
   uint64 flashback_start_ts = 8;
+  // table_group is present only for a Region protected by Table Group policy.
+  // The full Table Group record remains outside Region heartbeat metadata.
+  TableGroupRegionMeta table_group = 9;
 }
 
 enum PeerRole {

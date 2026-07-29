@@ -16542,6 +16542,26 @@
             ]
           },
           {
+            "name": "TableGroupRegionMeta",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "table_group_id",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "applied_metadata_version",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
             "name": "Region",
             "fields": [
               {
@@ -16584,6 +16604,11 @@
                 "id": 8,
                 "name": "flashback_start_ts",
                 "type": "uint64"
+              },
+              {
+                "id": 9,
+                "name": "table_group",
+                "type": "TableGroupRegionMeta"
               }
             ]
           },
@@ -26029,6 +26054,1062 @@
         ],
         "package": {
           "name": "schedulingpb"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.tikv.kvproto"
+          },
+          {
+            "name": "(gogoproto.goproto_sizecache_all)",
+            "value": "false"
+          },
+          {
+            "name": "(gogoproto.goproto_unkeyed_all)",
+            "value": "false"
+          },
+          {
+            "name": "(gogoproto.goproto_unrecognized_all)",
+            "value": "false"
+          },
+          {
+            "name": "(gogoproto.marshaler_all)",
+            "value": "true"
+          },
+          {
+            "name": "(gogoproto.sizer_all)",
+            "value": "true"
+          },
+          {
+            "name": "(gogoproto.unmarshaler_all)",
+            "value": "true"
+          },
+          {
+            "name": "(rustproto.lite_runtime_all)",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "table_grouppb.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "TableGroupState",
+            "enum_fields": [
+              {
+                "name": "TABLE_GROUP_STATE_UNSPECIFIED"
+              },
+              {
+                "name": "TABLE_GROUP_STATE_CREATING",
+                "integer": 1
+              },
+              {
+                "name": "TABLE_GROUP_STATE_ACTIVE",
+                "integer": 2
+              },
+              {
+                "name": "TABLE_GROUP_STATE_UPDATING_MEMBERSHIP",
+                "integer": 3
+              },
+              {
+                "name": "TABLE_GROUP_STATE_DELETING",
+                "integer": 4
+              },
+              {
+                "name": "TABLE_GROUP_STATE_TOMBSTONE",
+                "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "TableGroupOperationKind",
+            "enum_fields": [
+              {
+                "name": "TABLE_GROUP_OPERATION_KIND_UNSPECIFIED"
+              },
+              {
+                "name": "TABLE_GROUP_OPERATION_KIND_CREATE",
+                "integer": 1
+              },
+              {
+                "name": "TABLE_GROUP_OPERATION_KIND_UPDATE_MEMBERSHIP",
+                "integer": 2
+              },
+              {
+                "name": "TABLE_GROUP_OPERATION_KIND_DELETE",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "SplitPolicyMode",
+            "enum_fields": [
+              {
+                "name": "SPLIT_POLICY_MODE_UNSPECIFIED"
+              },
+              {
+                "name": "SPLIT_POLICY_MODE_FORBID",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "SplitSource",
+            "enum_fields": [
+              {
+                "name": "SPLIT_SOURCE_UNSPECIFIED"
+              },
+              {
+                "name": "SPLIT_SOURCE_AUTOMATIC_SIZE",
+                "integer": 1
+              },
+              {
+                "name": "SPLIT_SOURCE_AUTOMATIC_KEY_COUNT",
+                "integer": 2
+              },
+              {
+                "name": "SPLIT_SOURCE_AUTOMATIC_LOAD",
+                "integer": 3
+              },
+              {
+                "name": "SPLIT_SOURCE_MANUAL_REQUEST",
+                "integer": 4
+              },
+              {
+                "name": "SPLIT_SOURCE_ADMIN_COMMAND",
+                "integer": 5
+              },
+              {
+                "name": "SPLIT_SOURCE_RECOVERY_REPLAY",
+                "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "SplitRejectionReason",
+            "enum_fields": [
+              {
+                "name": "SPLIT_REJECTION_REASON_UNSPECIFIED"
+              },
+              {
+                "name": "SPLIT_REJECTION_REASON_POLICY_FORBIDS_SPLIT",
+                "integer": 1
+              },
+              {
+                "name": "SPLIT_REJECTION_REASON_STALE_METADATA",
+                "integer": 2
+              },
+              {
+                "name": "SPLIT_REJECTION_REASON_REGION_BINDING_MISMATCH",
+                "integer": 3
+              },
+              {
+                "name": "SPLIT_REJECTION_REASON_EXPLICIT_MIGRATION_REQUIRED",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "CapacityLimitAction",
+            "enum_fields": [
+              {
+                "name": "CAPACITY_LIMIT_ACTION_UNSPECIFIED"
+              },
+              {
+                "name": "CAPACITY_LIMIT_ACTION_REJECT",
+                "integer": 1
+              },
+              {
+                "name": "CAPACITY_LIMIT_ACTION_THROTTLE",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "CapacityDimension",
+            "enum_fields": [
+              {
+                "name": "CAPACITY_DIMENSION_UNSPECIFIED"
+              },
+              {
+                "name": "CAPACITY_DIMENSION_DATA_BYTES",
+                "integer": 1
+              },
+              {
+                "name": "CAPACITY_DIMENSION_WRITE_BYTES_PER_SECOND",
+                "integer": 2
+              },
+              {
+                "name": "CAPACITY_DIMENSION_REQUESTS_PER_SECOND",
+                "integer": 3
+              },
+              {
+                "name": "CAPACITY_DIMENSION_RAFT_LOG_BYTES",
+                "integer": 4
+              },
+              {
+                "name": "CAPACITY_DIMENSION_SNAPSHOT_BYTES",
+                "integer": 5
+              },
+              {
+                "name": "CAPACITY_DIMENSION_RECOVERY_SECONDS",
+                "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "CapacityState",
+            "enum_fields": [
+              {
+                "name": "CAPACITY_STATE_UNSPECIFIED"
+              },
+              {
+                "name": "CAPACITY_STATE_HEALTHY",
+                "integer": 1
+              },
+              {
+                "name": "CAPACITY_STATE_APPROACHING_LIMIT",
+                "integer": 2
+              },
+              {
+                "name": "CAPACITY_STATE_THROTTLED",
+                "integer": 3
+              },
+              {
+                "name": "CAPACITY_STATE_EXHAUSTED",
+                "integer": 4
+              },
+              {
+                "name": "CAPACITY_STATE_UNKNOWN",
+                "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "PlacementConstraintOperator",
+            "enum_fields": [
+              {
+                "name": "PLACEMENT_CONSTRAINT_OPERATOR_UNSPECIFIED"
+              },
+              {
+                "name": "PLACEMENT_CONSTRAINT_OPERATOR_IN",
+                "integer": 1
+              },
+              {
+                "name": "PLACEMENT_CONSTRAINT_OPERATOR_NOT_IN",
+                "integer": 2
+              },
+              {
+                "name": "PLACEMENT_CONSTRAINT_OPERATOR_EXISTS",
+                "integer": 3
+              },
+              {
+                "name": "PLACEMENT_CONSTRAINT_OPERATOR_NOT_EXISTS",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "TableGroupErrorCode",
+            "enum_fields": [
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_OK"
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_UNKNOWN",
+                "integer": 1
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_NOT_FOUND",
+                "integer": 2
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_ALREADY_EXISTS",
+                "integer": 3
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_INVALID_ARGUMENT",
+                "integer": 4
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_STALE_METADATA_VERSION",
+                "integer": 5
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_OPERATION_CONFLICT",
+                "integer": 6
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_INVALID_STATE",
+                "integer": 7
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_KEYSPACE_MISMATCH",
+                "integer": 8
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_REGION_MISMATCH",
+                "integer": 9
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_EPOCH_MISMATCH",
+                "integer": 10
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_MEMBERSHIP_CONFLICT",
+                "integer": 11
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_SPLIT_FORBIDDEN",
+                "integer": 12
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_CAPACITY_EXCEEDED",
+                "integer": 13
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_CAPACITY_UNKNOWN",
+                "integer": 14
+              },
+              {
+                "name": "TABLE_GROUP_ERROR_CODE_INTERNAL",
+                "integer": 15
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "RequestHeader",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cluster_id",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "sender_id",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "caller_id",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "caller_component",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ResponseHeader",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cluster_id",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "error",
+                "type": "TableGroupError"
+              }
+            ]
+          },
+          {
+            "name": "TableGroupIdentity",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "table_group_id",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "TableGroupOperation",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "kind",
+                "type": "TableGroupOperationKind"
+              },
+              {
+                "id": 3,
+                "name": "base_metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "target_metadata_version",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "TableGroupMember",
+            "fields": [
+              {
+                "id": 1,
+                "name": "table_id",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "partition_id",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "index_ids",
+                "type": "uint64",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "TableGroupMembership",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "members",
+                "type": "TableGroupMember",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "TableGroupRegionBinding",
+            "fields": [
+              {
+                "id": 1,
+                "name": "region_id",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "region_epoch",
+                "type": "metapb.RegionEpoch"
+              },
+              {
+                "id": 3,
+                "name": "shard_id",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "applied_metadata_version",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "SplitPolicy",
+            "fields": [
+              {
+                "id": 1,
+                "name": "mode",
+                "type": "SplitPolicyMode"
+              }
+            ]
+          },
+          {
+            "name": "CapacityBudget",
+            "fields": [
+              {
+                "id": 1,
+                "name": "max_data_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "max_write_bytes_per_second",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "max_requests_per_second",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "max_raft_log_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "max_snapshot_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "max_recovery_seconds",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "limit_action",
+                "type": "CapacityLimitAction"
+              }
+            ]
+          },
+          {
+            "name": "CapacityUsage",
+            "fields": [
+              {
+                "id": 1,
+                "name": "data_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "write_bytes_per_second",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "requests_per_second",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "raft_log_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "snapshot_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "recovery_seconds",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CapacityStatus",
+            "fields": [
+              {
+                "id": 1,
+                "name": "state",
+                "type": "CapacityState"
+              },
+              {
+                "id": 2,
+                "name": "usage",
+                "type": "CapacityUsage"
+              },
+              {
+                "id": 3,
+                "name": "limiting_dimensions",
+                "type": "CapacityDimension",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "observed_at_unix_millis",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "PlacementConstraint",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "operator",
+                "type": "PlacementConstraintOperator"
+              },
+              {
+                "id": 3,
+                "name": "values",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PlacementIntent",
+            "fields": [
+              {
+                "id": 1,
+                "name": "replica_count",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "location_labels",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "replica_constraints",
+                "type": "PlacementConstraint",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "leader_constraints",
+                "type": "PlacementConstraint",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "TableGroup",
+            "fields": [
+              {
+                "id": 1,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              },
+              {
+                "id": 2,
+                "name": "metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "state",
+                "type": "TableGroupState"
+              },
+              {
+                "id": 4,
+                "name": "active_membership",
+                "type": "TableGroupMembership"
+              },
+              {
+                "id": 5,
+                "name": "prepared_membership",
+                "type": "TableGroupMembership"
+              },
+              {
+                "id": 6,
+                "name": "pending_operation",
+                "type": "TableGroupOperation"
+              },
+              {
+                "id": 7,
+                "name": "region_binding",
+                "type": "TableGroupRegionBinding"
+              },
+              {
+                "id": 8,
+                "name": "split_policy",
+                "type": "SplitPolicy"
+              },
+              {
+                "id": 9,
+                "name": "capacity_budget",
+                "type": "CapacityBudget"
+              },
+              {
+                "id": 10,
+                "name": "capacity_status",
+                "type": "CapacityStatus"
+              },
+              {
+                "id": 11,
+                "name": "placement_intent",
+                "type": "PlacementIntent"
+              },
+              {
+                "id": 12,
+                "name": "status_version",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "TableGroupError",
+            "fields": [
+              {
+                "id": 1,
+                "name": "code",
+                "type": "TableGroupErrorCode"
+              },
+              {
+                "id": 2,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              },
+              {
+                "id": 4,
+                "name": "expected_metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "actual_metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "operation_token",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "split_source",
+                "type": "SplitSource"
+              },
+              {
+                "id": 8,
+                "name": "split_rejection_reason",
+                "type": "SplitRejectionReason"
+              },
+              {
+                "id": 9,
+                "name": "capacity_dimensions",
+                "type": "CapacityDimension",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CreateTableGroupRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "requested_table_group_id",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "region_binding",
+                "type": "TableGroupRegionBinding"
+              },
+              {
+                "id": 5,
+                "name": "split_policy",
+                "type": "SplitPolicy"
+              },
+              {
+                "id": 6,
+                "name": "capacity_budget",
+                "type": "CapacityBudget"
+              },
+              {
+                "id": 7,
+                "name": "placement_intent",
+                "type": "PlacementIntent"
+              },
+              {
+                "id": 8,
+                "name": "operation_token",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "CreateTableGroupResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "table_group",
+                "type": "TableGroup"
+              }
+            ]
+          },
+          {
+            "name": "GetTableGroupRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              }
+            ]
+          },
+          {
+            "name": "GetTableGroupResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "table_group",
+                "type": "TableGroup"
+              }
+            ]
+          },
+          {
+            "name": "GetTableGroupByRegionRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "region_id",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "GetTableGroupByRegionResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "table_group",
+                "type": "TableGroup"
+              }
+            ]
+          },
+          {
+            "name": "PrepareMembershipRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              },
+              {
+                "id": 3,
+                "name": "expected_metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "proposed_membership",
+                "type": "TableGroupMembership"
+              },
+              {
+                "id": 5,
+                "name": "operation_token",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "PrepareMembershipResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "table_group",
+                "type": "TableGroup"
+              }
+            ]
+          },
+          {
+            "name": "CommitMembershipRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              },
+              {
+                "id": 3,
+                "name": "expected_metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "membership_version",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "operation_token",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "CommitMembershipResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "table_group",
+                "type": "TableGroup"
+              }
+            ]
+          },
+          {
+            "name": "AbortMembershipRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              },
+              {
+                "id": 3,
+                "name": "expected_metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "membership_version",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "operation_token",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "AbortMembershipResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "table_group",
+                "type": "TableGroup"
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "TableGroupService",
+            "rpcs": [
+              {
+                "name": "CreateTableGroup",
+                "in_type": "CreateTableGroupRequest",
+                "out_type": "CreateTableGroupResponse"
+              },
+              {
+                "name": "GetTableGroup",
+                "in_type": "GetTableGroupRequest",
+                "out_type": "GetTableGroupResponse"
+              },
+              {
+                "name": "GetTableGroupByRegion",
+                "in_type": "GetTableGroupByRegionRequest",
+                "out_type": "GetTableGroupByRegionResponse"
+              },
+              {
+                "name": "PrepareMembership",
+                "in_type": "PrepareMembershipRequest",
+                "out_type": "PrepareMembershipResponse"
+              },
+              {
+                "name": "CommitMembership",
+                "in_type": "CommitMembershipRequest",
+                "out_type": "CommitMembershipResponse"
+              },
+              {
+                "name": "AbortMembership",
+                "in_type": "AbortMembershipRequest",
+                "out_type": "AbortMembershipResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "gogoproto/gogo.proto"
+          },
+          {
+            "path": "metapb.proto"
+          },
+          {
+            "path": "rustproto.proto"
+          }
+        ],
+        "package": {
+          "name": "table_grouppb"
         },
         "options": [
           {
