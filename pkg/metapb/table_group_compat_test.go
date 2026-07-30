@@ -35,6 +35,26 @@ func roundTrip(t *testing.T, input proto.Message, output proto.Message) {
 	}
 }
 
+func testRegionBinding(fragmentID uint32) *table_grouppb.TableGroupRegionBinding {
+	return &table_grouppb.TableGroupRegionBinding{
+		RegionId:               2001 + uint64(fragmentID),
+		RegionEpoch:            &metapb.RegionEpoch{ConfVer: 4, Version: 5},
+		ShardId:                3001 + uint64(fragmentID),
+		AppliedMetadataVersion: 7,
+	}
+}
+
+func testFragmentBindings(count uint32) []*table_grouppb.TableGroupFragmentBinding {
+	bindings := make([]*table_grouppb.TableGroupFragmentBinding, 0, count)
+	for fragmentID := uint32(0); fragmentID < count; fragmentID++ {
+		bindings = append(bindings, &table_grouppb.TableGroupFragmentBinding{
+			FragmentId:    fragmentID,
+			RegionBinding: testRegionBinding(fragmentID),
+		})
+	}
+	return bindings
+}
+
 func testTableGroup() *table_grouppb.TableGroup {
 	identity := &table_grouppb.TableGroupIdentity{
 		KeyspaceId:   0,
@@ -67,12 +87,6 @@ func testTableGroup() *table_grouppb.TableGroup {
 			Kind:                  table_grouppb.TableGroupOperationKind_TABLE_GROUP_OPERATION_KIND_UPDATE_MEMBERSHIP,
 			BaseMetadataVersion:   7,
 			TargetMetadataVersion: 8,
-		},
-		RegionBinding: &table_grouppb.TableGroupRegionBinding{
-			RegionId:               2001,
-			RegionEpoch:            &metapb.RegionEpoch{ConfVer: 4, Version: 5},
-			ShardId:                3001,
-			AppliedMetadataVersion: 7,
 		},
 		SplitPolicy: &table_grouppb.SplitPolicy{
 			Mode: table_grouppb.SplitPolicyMode_SPLIT_POLICY_MODE_FORBID,
@@ -120,6 +134,12 @@ func testTableGroup() *table_grouppb.TableGroup {
 				},
 			},
 		},
+		Partitioning: &table_grouppb.TableGroupPartitioning{
+			Method:         table_grouppb.TableGroupPartitionMethod_TABLE_GROUP_PARTITION_METHOD_HASH,
+			PartitionCount: 9,
+			HashAlgorithm:  table_grouppb.TableGroupHashAlgorithm_TABLE_GROUP_HASH_ALGORITHM_MODULO_U64_V1,
+		},
+		FragmentBindings: testFragmentBindings(9),
 	}
 }
 
@@ -147,11 +167,12 @@ func TestTableGroupMessagesRoundTrip(t *testing.T) {
 				},
 				KeyspaceId:            0,
 				RequestedTableGroupId: 1001,
-				RegionBinding:         group.RegionBinding,
 				SplitPolicy:           group.SplitPolicy,
 				CapacityBudget:        group.CapacityBudget,
 				PlacementIntent:       group.PlacementIntent,
 				OperationToken:        []byte("create-operation"),
+				Partitioning:          group.Partitioning,
+				FragmentBindings:      group.FragmentBindings,
 			},
 			output: &table_grouppb.CreateTableGroupRequest{},
 		},
@@ -189,6 +210,32 @@ func TestTableGroupMessagesRoundTrip(t *testing.T) {
 			output: &table_grouppb.AbortMembershipRequest{},
 		},
 		{
+			name: "route response",
+			input: &table_grouppb.GetTableGroupRouteResponse{
+				Header: &table_grouppb.ResponseHeader{ClusterId: 42},
+				Route: &table_grouppb.TableGroupRoute{
+					Identity:                group.Identity,
+					MetadataVersion:         group.MetadataVersion,
+					StatusVersion:           group.StatusVersion,
+					ActiveMembershipVersion: group.ActiveMembership.Version,
+					Partitioning:            group.Partitioning,
+					FragmentRoutes: func() []*table_grouppb.TableGroupFragmentRoute {
+						routes := make([]*table_grouppb.TableGroupFragmentRoute, 0, 9)
+						for fragmentID, binding := range group.FragmentBindings {
+							routes = append(routes, &table_grouppb.TableGroupFragmentRoute{
+								FragmentId:       uint32(fragmentID),
+								RegionBinding:    binding.RegionBinding,
+								LeaderStoreId:    4001 + uint64(fragmentID%3),
+								LeaderSqlAddress: "10.0.0.1:4000",
+							})
+						}
+						return routes
+					}(),
+				},
+			},
+			output: &table_grouppb.GetTableGroupRouteResponse{},
+		},
+		{
 			name: "response error",
 			input: &table_grouppb.GetTableGroupResponse{
 				Header: &table_grouppb.ResponseHeader{
@@ -217,6 +264,22 @@ func TestTableGroupMessagesRoundTrip(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			roundTrip(t, test.input, test.output)
 		})
+	}
+}
+
+func TestLegacySingleRegionTableGroupRoundTrip(t *testing.T) {
+	legacy := &table_grouppb.TableGroup{
+		Identity:         &table_grouppb.TableGroupIdentity{KeyspaceId: 1, TableGroupId: 1001},
+		MetadataVersion:  1,
+		StatusVersion:    1,
+		State:            table_grouppb.TableGroupState_TABLE_GROUP_STATE_ACTIVE,
+		ActiveMembership: &table_grouppb.TableGroupMembership{Version: 1},
+		RegionBinding:    testRegionBinding(0),
+	}
+	decoded := &table_grouppb.TableGroup{}
+	roundTrip(t, legacy, decoded)
+	if decoded.Partitioning != nil || len(decoded.FragmentBindings) != 0 {
+		t.Fatalf("legacy Table Group unexpectedly enabled partitioning: %v", decoded)
 	}
 }
 
@@ -295,5 +358,29 @@ func TestRegionTableGroupUsesFieldNumberNine(t *testing.T) {
 	tag := field.Tag.Get("protobuf")
 	if !strings.HasPrefix(tag, "bytes,9,") {
 		t.Fatalf("Region.TableGroup protobuf tag = %q, want field number 9", tag)
+	}
+}
+
+func TestDistributedTableGroupFieldNumbersAreAdditive(t *testing.T) {
+	tests := []struct {
+		messageType reflect.Type
+		field       string
+		prefix      string
+	}{
+		{reflect.TypeOf(metapb.Store{}), "SqlAddress", "bytes,14,"},
+		{reflect.TypeOf(metapb.TableGroupRegionMeta{}), "FragmentId", "varint,4,"},
+		{reflect.TypeOf(table_grouppb.TableGroup{}), "Partitioning", "bytes,13,"},
+		{reflect.TypeOf(table_grouppb.TableGroup{}), "FragmentBindings", "bytes,14,"},
+		{reflect.TypeOf(table_grouppb.CreateTableGroupRequest{}), "Partitioning", "bytes,9,"},
+		{reflect.TypeOf(table_grouppb.CreateTableGroupRequest{}), "FragmentBindings", "bytes,10,"},
+	}
+	for _, test := range tests {
+		field, ok := test.messageType.FieldByName(test.field)
+		if !ok {
+			t.Fatalf("%s has no %s field", test.messageType, test.field)
+		}
+		if tag := field.Tag.Get("protobuf"); !strings.HasPrefix(tag, test.prefix) {
+			t.Fatalf("%s.%s protobuf tag = %q, want prefix %q", test.messageType, test.field, tag, test.prefix)
+		}
 	}
 }

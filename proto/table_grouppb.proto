@@ -21,6 +21,7 @@ service TableGroupService {
   rpc CreateTableGroup(CreateTableGroupRequest) returns (CreateTableGroupResponse) {}
   rpc GetTableGroup(GetTableGroupRequest) returns (GetTableGroupResponse) {}
   rpc GetTableGroupByRegion(GetTableGroupByRegionRequest) returns (GetTableGroupByRegionResponse) {}
+  rpc GetTableGroupRoute(GetTableGroupRouteRequest) returns (GetTableGroupRouteResponse) {}
   rpc PrepareMembership(PrepareMembershipRequest) returns (PrepareMembershipResponse) {}
   rpc CommitMembership(CommitMembershipRequest) returns (CommitMembershipResponse) {}
   rpc AbortMembership(AbortMembershipRequest) returns (AbortMembershipResponse) {}
@@ -123,6 +124,38 @@ message TableGroupRegionBinding {
   uint64 shard_id = 3;
   // applied_metadata_version is the version reported by the Region mirror.
   uint64 applied_metadata_version = 4;
+}
+
+// TableGroupPartitionMethod defines how a routing value selects one fragment.
+// Unspecified is reserved for legacy single-Region groups that predate this
+// contract and must be normalized to SINGLE by new consumers.
+enum TableGroupPartitionMethod {
+  TABLE_GROUP_PARTITION_METHOD_UNSPECIFIED = 0;
+  TABLE_GROUP_PARTITION_METHOD_SINGLE = 1;
+  TABLE_GROUP_PARTITION_METHOD_HASH = 2;
+}
+
+// TableGroupHashAlgorithm freezes the cross-language hash contract.
+enum TableGroupHashAlgorithm {
+  TABLE_GROUP_HASH_ALGORITHM_UNSPECIFIED = 0;
+  // MODULO_U64_V1 maps an unsigned routing value to
+  // routing_value % partition_count.
+  TABLE_GROUP_HASH_ALGORITHM_MODULO_U64_V1 = 1;
+}
+
+// TableGroupPartitioning is immutable after the first Region mirror is
+// attached. partition_count is the number of independently placed fragments.
+message TableGroupPartitioning {
+  TableGroupPartitionMethod method = 1;
+  uint32 partition_count = 2;
+  TableGroupHashAlgorithm hash_algorithm = 3;
+}
+
+// TableGroupFragmentBinding binds one canonical fragment to one
+// Region/Raft Group/Shard. fragment_id values are zero-based and contiguous.
+message TableGroupFragmentBinding {
+  uint32 fragment_id = 1;
+  TableGroupRegionBinding region_binding = 2;
 }
 
 // SplitPolicyMode controls whether ordinary Region split paths are allowed.
@@ -294,6 +327,32 @@ message TableGroup {
   // status_version is non-zero and advances when observed applied metadata or
   // capacity status changes. Status updates do not invalidate metadata CAS.
   uint64 status_version = 12;
+  // partitioning is absent only for a legacy single-Region group.
+  TableGroupPartitioning partitioning = 13;
+  // fragment_bindings is the complete canonical binding set for a new-format
+  // group and is ordered by fragment_id. It is empty for a legacy group.
+  repeated TableGroupFragmentBinding fragment_bindings = 14;
+}
+
+// TableGroupFragmentRoute is a derived routing snapshot. PD remains
+// authoritative for the binding while current Region/store state supplies the
+// leader and its embedded SQL address.
+message TableGroupFragmentRoute {
+  uint32 fragment_id = 1;
+  TableGroupRegionBinding region_binding = 2;
+  uint64 leader_store_id = 3;
+  string leader_sql_address = 4;
+}
+
+// TableGroupRoute is safe for TiProxy caching. Consumers compare the complete
+// metadata/status/Region epochs and leader fields rather than diagnostic text.
+message TableGroupRoute {
+  TableGroupIdentity identity = 1;
+  uint64 metadata_version = 2;
+  uint64 status_version = 3;
+  uint64 active_membership_version = 4;
+  TableGroupPartitioning partitioning = 5;
+  repeated TableGroupFragmentRoute fragment_routes = 6;
 }
 
 // TableGroupErrorCode is stable and determines caller retry behavior.
@@ -357,6 +416,10 @@ message CreateTableGroupRequest {
   PlacementIntent placement_intent = 7;
   // operation_token makes create retries idempotent.
   bytes operation_token = 8;
+  // partitioning and fragment_bindings are both required for a new-format
+  // group. They are both absent for the legacy region_binding path.
+  TableGroupPartitioning partitioning = 9;
+  repeated TableGroupFragmentBinding fragment_bindings = 10;
 }
 
 // CreateTableGroupResponse returns the created or idempotently replayed snapshot.
@@ -391,6 +454,20 @@ message GetTableGroupByRegionRequest {
 message GetTableGroupByRegionResponse {
   ResponseHeader header = 1;
   TableGroup table_group = 2;
+}
+
+// GetTableGroupRouteRequest resolves the current leader SQL route for every
+// fragment of one complete Table Group identity.
+message GetTableGroupRouteRequest {
+  RequestHeader header = 1;
+  TableGroupIdentity identity = 2;
+}
+
+// GetTableGroupRouteResponse returns a complete routing snapshot. A success
+// response never omits a fragment or returns an empty leader SQL address.
+message GetTableGroupRouteResponse {
+  ResponseHeader header = 1;
+  TableGroupRoute route = 2;
 }
 
 // PrepareMembershipRequest stores a complete next membership without making it active.

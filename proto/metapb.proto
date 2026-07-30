@@ -67,6 +67,9 @@ message Store {
   bool physically_destroyed = 12;
   // NodeState is used to replace StoreState which will be deprecated in the future.
   NodeState node_state = 13;
+  // sql_address is the optional embedded MySQL endpoint advertised by a CSE
+  // store. It is empty for ordinary TiKV stores.
+  string sql_address = 14;
 }
 
 message RegionEpoch {
@@ -132,6 +135,9 @@ message TableGroupRegionMeta {
   // applied_metadata_version is the authoritative Table Group metadata version
   // durably applied by this Region. It is non-zero and monotonically increasing.
   uint64 applied_metadata_version = 3;
+  // fragment_id identifies the zero-based Table Group fragment owned by this
+  // Region. Legacy single-Region groups use zero.
+  uint32 fragment_id = 4;
 }
 
 message Region {

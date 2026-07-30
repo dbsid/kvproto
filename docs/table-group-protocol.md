@@ -33,13 +33,45 @@ Presence activates validation, not permissive behavior. A consumer must fail clo
 - Status-only changes never advance or invalidate metadata compare-and-swap operations.
 - Lower versions are stale. Consumers do not silently accept a skipped version.
 
-## Region Binding
+## Partitioning And Region Binding
 
-One `TableGroupRegionBinding` contains exactly one Region ID, one Region epoch, one CSE Shard ID, and the observed applied metadata version. Region ID also identifies the Raft Group. No list or secondary binding exists in this version.
+One `TableGroupRegionBinding` contains exactly one Region ID, one Region epoch,
+one CSE Shard ID, and the observed applied metadata version. Region ID also
+identifies the Raft Group.
+
+A new-format Table Group has one `TableGroupPartitioning` and a complete,
+ordered `fragment_bindings` list. `fragment_id` values are zero-based,
+contiguous, and cover `[0, partition_count)`. Region IDs and Shard IDs are
+unique across the list. A hash group requires
+`TABLE_GROUP_HASH_ALGORITHM_MODULO_U64_V1`, which maps an unsigned routing
+value to `routing_value % partition_count` identically in every language.
+
+The original `region_binding` field remains the canonical legacy
+single-Region representation. A legacy group has no `partitioning` and no
+`fragment_bindings`; new consumers normalize it in memory to `SINGLE` with
+fragment zero. A persisted or requested hybrid representation is invalid.
 
 Region ID, epoch, and Shard ID are metadata-versioned binding spec. `applied_metadata_version` is status-versioned observation. This separation prevents authority acknowledgement from creating a new metadata version that the Region must immediately apply again.
 
-Before the first mirror attachment, CSE cannot know the allocated Table Group ID from Region metadata. `GetTableGroupByRegion` therefore resolves an existing PD authority snapshot by `(keyspace_id, region_id)`. It is a read-only recovery/discovery operation over the same authoritative record and Region index; it does not create a second metadata source. The explicit keyspace ID prevents a caller from using a Region lookup to cross a tenant boundary.
+Before the first mirror attachment, CSE cannot know the allocated Table Group ID from Region metadata. `GetTableGroupByRegion` therefore resolves an existing PD authority snapshot by `(keyspace_id, region_id)` for either a legacy binding or any new fragment binding. It is a read-only recovery/discovery operation over the same authoritative record and Region index; it does not create a second metadata source. The explicit keyspace ID prevents a caller from using a Region lookup to cross a tenant boundary.
+
+`metapb.TableGroupRegionMeta.fragment_id` identifies which fragment the Region
+owns. It is zero for both a legacy single-Region group and fragment zero of a
+new group; the authoritative snapshot distinguishes those cases.
+
+## TiProxy Route Snapshot
+
+`GetTableGroupRoute` returns every fragment in one response. Binding identity,
+metadata version, status version, and membership version come from the Table
+Group authority. Leader store and embedded SQL address are derived from
+current Region/store state and are never persisted as membership or binding
+specification.
+
+A successful route has exactly one entry per canonical fragment, a non-zero
+leader store, and a non-empty `leader_sql_address`. TiProxy must refresh after
+NotLeader/epoch failures and compare the complete snapshot; diagnostic strings
+are not a cache key. Ordinary TiKV stores leave `metapb.Store.sql_address`
+empty and are ineligible as embedded SQL backends.
 
 ## Membership
 
@@ -120,7 +152,9 @@ Existing numbers are immutable. New fields must be additive and must pass `proto
 | `TableGroupRegionMeta` | `keyspace_id` | 1 |
 | `TableGroupRegionMeta` | `table_group_id` | 2 |
 | `TableGroupRegionMeta` | `applied_metadata_version` | 3 |
+| `TableGroupRegionMeta` | `fragment_id` | 4 |
 | `Region` | `table_group` | 9 |
+| `Store` | `sql_address` | 14 |
 
 `Region` fields 1 through 8 retain their previous assignments and semantics.
 
@@ -133,7 +167,11 @@ Existing numbers are immutable. New fields must be additive and must pass `proto
 | `TableGroupMember` | `table_id=1`, `partition_id=2`, `index_ids=3` |
 | `TableGroupMembership` | `version=1`, `members=2` |
 | `TableGroupRegionBinding` | `region_id=1`, `region_epoch=2`, `shard_id=3`, `applied_metadata_version=4` |
-| `TableGroup` | `identity=1`, `metadata_version=2`, `state=3`, `active_membership=4`, `prepared_membership=5`, `pending_operation=6`, `region_binding=7`, `split_policy=8`, `capacity_budget=9`, `capacity_status=10`, `placement_intent=11`, `status_version=12` |
+| `TableGroupPartitioning` | `method=1`, `partition_count=2`, `hash_algorithm=3` |
+| `TableGroupFragmentBinding` | `fragment_id=1`, `region_binding=2` |
+| `TableGroup` | `identity=1`, `metadata_version=2`, `state=3`, `active_membership=4`, `prepared_membership=5`, `pending_operation=6`, `region_binding=7`, `split_policy=8`, `capacity_budget=9`, `capacity_status=10`, `placement_intent=11`, `status_version=12`, `partitioning=13`, `fragment_bindings=14` |
+| `TableGroupFragmentRoute` | `fragment_id=1`, `region_binding=2`, `leader_store_id=3`, `leader_sql_address=4` |
+| `TableGroupRoute` | `identity=1`, `metadata_version=2`, `status_version=3`, `active_membership_version=4`, `partitioning=5`, `fragment_routes=6` |
 | `TableGroupError` | `code=1`, `message=2`, `identity=3`, `expected_metadata_version=4`, `actual_metadata_version=5`, `operation_token=6`, `split_source=7`, `split_rejection_reason=8`, `capacity_dimensions=9` |
 
 ### Policy Messages
@@ -151,14 +189,16 @@ Existing numbers are immutable. New fields must be additive and must pass `proto
 
 | Message | Assignments |
 |---|---|
-| `CreateTableGroupRequest` | `header=1`, `keyspace_id=2`, `requested_table_group_id=3`, `region_binding=4`, `split_policy=5`, `capacity_budget=6`, `placement_intent=7`, `operation_token=8` |
+| `CreateTableGroupRequest` | `header=1`, `keyspace_id=2`, `requested_table_group_id=3`, `region_binding=4`, `split_policy=5`, `capacity_budget=6`, `placement_intent=7`, `operation_token=8`, `partitioning=9`, `fragment_bindings=10` |
 | `GetTableGroupRequest` | `header=1`, `identity=2` |
 | `GetTableGroupByRegionRequest` | `header=1`, `keyspace_id=2`, `region_id=3` |
+| `GetTableGroupRouteRequest` | `header=1`, `identity=2` |
 | `PrepareMembershipRequest` | `header=1`, `identity=2`, `expected_metadata_version=3`, `proposed_membership=4`, `operation_token=5` |
 | `CommitMembershipRequest` | `header=1`, `identity=2`, `expected_metadata_version=3`, `membership_version=4`, `operation_token=5` |
 | `AbortMembershipRequest` | `header=1`, `identity=2`, `expected_metadata_version=3`, `membership_version=4`, `operation_token=5` |
 
-All lifecycle responses use `header=1`, `table_group=2`.
+Lifecycle responses use `header=1`, `table_group=2`; the route response uses
+`header=1`, `route=2`.
 
 ## Compatibility Verification
 

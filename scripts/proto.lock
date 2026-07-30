@@ -16875,6 +16875,11 @@
                 "id": 13,
                 "name": "node_state",
                 "type": "NodeState"
+              },
+              {
+                "id": 14,
+                "name": "sql_address",
+                "type": "string"
               }
             ]
           },
@@ -16998,6 +17003,11 @@
                 "id": 3,
                 "name": "applied_metadata_version",
                 "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "fragment_id",
+                "type": "uint32"
               }
             ]
           },
@@ -26655,6 +26665,34 @@
             ]
           },
           {
+            "name": "TableGroupPartitionMethod",
+            "enum_fields": [
+              {
+                "name": "TABLE_GROUP_PARTITION_METHOD_UNSPECIFIED"
+              },
+              {
+                "name": "TABLE_GROUP_PARTITION_METHOD_SINGLE",
+                "integer": 1
+              },
+              {
+                "name": "TABLE_GROUP_PARTITION_METHOD_HASH",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "TableGroupHashAlgorithm",
+            "enum_fields": [
+              {
+                "name": "TABLE_GROUP_HASH_ALGORITHM_UNSPECIFIED"
+              },
+              {
+                "name": "TABLE_GROUP_HASH_ALGORITHM_MODULO_U64_V1",
+                "integer": 1
+              }
+            ]
+          },
+          {
             "name": "SplitPolicyMode",
             "enum_fields": [
               {
@@ -27035,6 +27073,41 @@
             ]
           },
           {
+            "name": "TableGroupPartitioning",
+            "fields": [
+              {
+                "id": 1,
+                "name": "method",
+                "type": "TableGroupPartitionMethod"
+              },
+              {
+                "id": 2,
+                "name": "partition_count",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "hash_algorithm",
+                "type": "TableGroupHashAlgorithm"
+              }
+            ]
+          },
+          {
+            "name": "TableGroupFragmentBinding",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fragment_id",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "region_binding",
+                "type": "TableGroupRegionBinding"
+              }
+            ]
+          },
+          {
             "name": "SplitPolicy",
             "fields": [
               {
@@ -27256,6 +27329,78 @@
                 "id": 12,
                 "name": "status_version",
                 "type": "uint64"
+              },
+              {
+                "id": 13,
+                "name": "partitioning",
+                "type": "TableGroupPartitioning"
+              },
+              {
+                "id": 14,
+                "name": "fragment_bindings",
+                "type": "TableGroupFragmentBinding",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "TableGroupFragmentRoute",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fragment_id",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "region_binding",
+                "type": "TableGroupRegionBinding"
+              },
+              {
+                "id": 3,
+                "name": "leader_store_id",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "leader_sql_address",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "TableGroupRoute",
+            "fields": [
+              {
+                "id": 1,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              },
+              {
+                "id": 2,
+                "name": "metadata_version",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "status_version",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "active_membership_version",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "partitioning",
+                "type": "TableGroupPartitioning"
+              },
+              {
+                "id": 6,
+                "name": "fragment_routes",
+                "type": "TableGroupFragmentRoute",
+                "is_repeated": true
               }
             ]
           },
@@ -27352,6 +27497,17 @@
                 "id": 8,
                 "name": "operation_token",
                 "type": "bytes"
+              },
+              {
+                "id": 9,
+                "name": "partitioning",
+                "type": "TableGroupPartitioning"
+              },
+              {
+                "id": 10,
+                "name": "fragment_bindings",
+                "type": "TableGroupFragmentBinding",
+                "is_repeated": true
               }
             ]
           },
@@ -27432,6 +27588,36 @@
                 "id": 2,
                 "name": "table_group",
                 "type": "TableGroup"
+              }
+            ]
+          },
+          {
+            "name": "GetTableGroupRouteRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "RequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "identity",
+                "type": "TableGroupIdentity"
+              }
+            ]
+          },
+          {
+            "name": "GetTableGroupRouteResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "route",
+                "type": "TableGroupRoute"
               }
             ]
           },
@@ -27589,6 +27775,11 @@
                 "name": "GetTableGroupByRegion",
                 "in_type": "GetTableGroupByRegionRequest",
                 "out_type": "GetTableGroupByRegionResponse"
+              },
+              {
+                "name": "GetTableGroupRoute",
+                "in_type": "GetTableGroupRouteRequest",
+                "out_type": "GetTableGroupRouteResponse"
               },
               {
                 "name": "PrepareMembership",
