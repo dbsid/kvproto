@@ -27902,6 +27902,16 @@
             "name": "Tikv",
             "rpcs": [
               {
+                "name": "TxnProtocolNegotiate",
+                "in_type": "txn_protocolpb.NegotiateRequest",
+                "out_type": "txn_protocolpb.NegotiateResponse"
+              },
+              {
+                "name": "TxnParticipant",
+                "in_type": "txn_protocolpb.ParticipantRequest",
+                "out_type": "txn_protocolpb.ParticipantResponse"
+              },
+              {
                 "name": "KvGet",
                 "in_type": "kvrpcpb.GetRequest",
                 "out_type": "kvrpcpb.GetResponse"
@@ -28306,6 +28316,9 @@
           },
           {
             "path": "rustproto.proto"
+          },
+          {
+            "path": "txn_protocol.proto"
           }
         ],
         "package": {
@@ -28875,6 +28888,1224 @@
         ],
         "package": {
           "name": "tsopb"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.tikv.kvproto"
+          },
+          {
+            "name": "(gogoproto.goproto_sizecache_all)",
+            "value": "false"
+          },
+          {
+            "name": "(gogoproto.goproto_unkeyed_all)",
+            "value": "false"
+          },
+          {
+            "name": "(gogoproto.goproto_unrecognized_all)",
+            "value": "false"
+          },
+          {
+            "name": "(gogoproto.marshaler_all)",
+            "value": "true"
+          },
+          {
+            "name": "(gogoproto.sizer_all)",
+            "value": "true"
+          },
+          {
+            "name": "(gogoproto.unmarshaler_all)",
+            "value": "true"
+          },
+          {
+            "name": "(rustproto.lite_runtime_all)",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "txn_protocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Capability",
+            "enum_fields": [
+              {
+                "name": "PROTOCOL_CAPABILITY_UNSPECIFIED"
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_SNAPSHOT_READ",
+                "integer": 1
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_OPTIMISTIC",
+                "integer": 2
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_PESSIMISTIC",
+                "integer": 3
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_ONE_PC",
+                "integer": 4
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_ASYNC_COMMIT",
+                "integer": 5
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_TWO_PC",
+                "integer": 6
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_LOCK_RESOLUTION",
+                "integer": 7
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_CHECK_TXN_STATUS_MUTATION",
+                "integer": 8
+              },
+              {
+                "name": "PROTOCOL_CAPABILITY_VERSIONED_RECOVERY",
+                "integer": 9
+              }
+            ]
+          },
+          {
+            "name": "NegotiationStatus",
+            "enum_fields": [
+              {
+                "name": "NEGOTIATION_STATUS_UNSPECIFIED"
+              },
+              {
+                "name": "NEGOTIATION_STATUS_ACCEPTED",
+                "integer": 1
+              },
+              {
+                "name": "NEGOTIATION_STATUS_UNSUPPORTED_VERSION",
+                "integer": 2
+              },
+              {
+                "name": "NEGOTIATION_STATUS_MISSING_CAPABILITY",
+                "integer": 3
+              },
+              {
+                "name": "NEGOTIATION_STATUS_CONTEXT_MISMATCH",
+                "integer": 4
+              },
+              {
+                "name": "NEGOTIATION_STATUS_UNAUTHORIZED",
+                "integer": 5
+              },
+              {
+                "name": "NEGOTIATION_STATUS_RESOURCE_EXHAUSTED",
+                "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "CommandKind",
+            "enum_fields": [
+              {
+                "name": "COMMAND_KIND_UNSPECIFIED"
+              },
+              {
+                "name": "COMMAND_KIND_SNAPSHOT_GET",
+                "integer": 1
+              },
+              {
+                "name": "COMMAND_KIND_SNAPSHOT_SCAN",
+                "integer": 2
+              },
+              {
+                "name": "COMMAND_KIND_PESSIMISTIC_LOCK",
+                "integer": 3
+              },
+              {
+                "name": "COMMAND_KIND_PESSIMISTIC_ROLLBACK",
+                "integer": 4
+              },
+              {
+                "name": "COMMAND_KIND_PREWRITE",
+                "integer": 5
+              },
+              {
+                "name": "COMMAND_KIND_COMMIT",
+                "integer": 6
+              },
+              {
+                "name": "COMMAND_KIND_BATCH_ROLLBACK",
+                "integer": 7
+              },
+              {
+                "name": "COMMAND_KIND_TXN_HEART_BEAT",
+                "integer": 8
+              },
+              {
+                "name": "COMMAND_KIND_CHECK_TXN_STATUS",
+                "integer": 9
+              },
+              {
+                "name": "COMMAND_KIND_CHECK_SECONDARY_LOCKS",
+                "integer": 10
+              },
+              {
+                "name": "COMMAND_KIND_RESOLVE_LOCK",
+                "integer": 11
+              }
+            ]
+          },
+          {
+            "name": "MutationEffect",
+            "enum_fields": [
+              {
+                "name": "MUTATION_EFFECT_UNSPECIFIED"
+              },
+              {
+                "name": "MUTATION_EFFECT_NOT_APPLIED",
+                "integer": 1
+              },
+              {
+                "name": "MUTATION_EFFECT_APPLIED",
+                "integer": 2
+              },
+              {
+                "name": "MUTATION_EFFECT_UNDETERMINED",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "ResultCertainty",
+            "enum_fields": [
+              {
+                "name": "RESULT_CERTAINTY_UNSPECIFIED"
+              },
+              {
+                "name": "RESULT_CERTAINTY_DEFINITIVE",
+                "integer": 1
+              },
+              {
+                "name": "RESULT_CERTAINTY_RETRYABLE",
+                "integer": 2
+              },
+              {
+                "name": "RESULT_CERTAINTY_UNDETERMINED",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "RetryDirective",
+            "enum_fields": [
+              {
+                "name": "RETRY_DIRECTIVE_UNSPECIFIED"
+              },
+              {
+                "name": "RETRY_DIRECTIVE_NEVER",
+                "integer": 1
+              },
+              {
+                "name": "RETRY_DIRECTIVE_SAME_REQUEST",
+                "integer": 2
+              },
+              {
+                "name": "RETRY_DIRECTIVE_REFRESH_ROUTE",
+                "integer": 3
+              },
+              {
+                "name": "RETRY_DIRECTIVE_RESOLVE_LOCK",
+                "integer": 4
+              },
+              {
+                "name": "RETRY_DIRECTIVE_TRANSACTION",
+                "integer": 5
+              },
+              {
+                "name": "RETRY_DIRECTIVE_CHECK_STATUS",
+                "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "ErrorClass",
+            "enum_fields": [
+              {
+                "name": "ERROR_CLASS_UNSPECIFIED"
+              },
+              {
+                "name": "ERROR_CLASS_INVALID_PROTOCOL",
+                "integer": 1
+              },
+              {
+                "name": "ERROR_CLASS_UNAUTHORIZED",
+                "integer": 2
+              },
+              {
+                "name": "ERROR_CLASS_RESOURCE_EXHAUSTED",
+                "integer": 3
+              },
+              {
+                "name": "ERROR_CLASS_CANCELLED",
+                "integer": 4
+              },
+              {
+                "name": "ERROR_CLASS_DEADLINE_EXCEEDED",
+                "integer": 5
+              },
+              {
+                "name": "ERROR_CLASS_REGION_STALE",
+                "integer": 6
+              },
+              {
+                "name": "ERROR_CLASS_NOT_LEADER",
+                "integer": 7
+              },
+              {
+                "name": "ERROR_CLASS_UNAVAILABLE",
+                "integer": 8
+              },
+              {
+                "name": "ERROR_CLASS_KEY_LOCKED",
+                "integer": 9
+              },
+              {
+                "name": "ERROR_CLASS_WRITE_CONFLICT",
+                "integer": 10
+              },
+              {
+                "name": "ERROR_CLASS_DEADLOCK",
+                "integer": 11
+              },
+              {
+                "name": "ERROR_CLASS_LOCK_TIMEOUT",
+                "integer": 12
+              },
+              {
+                "name": "ERROR_CLASS_DUPLICATE_KEY",
+                "integer": 13
+              },
+              {
+                "name": "ERROR_CLASS_ASSERTION_FAILED",
+                "integer": 14
+              },
+              {
+                "name": "ERROR_CLASS_TXN_NOT_FOUND",
+                "integer": 15
+              },
+              {
+                "name": "ERROR_CLASS_ALREADY_COMMITTED",
+                "integer": 16
+              },
+              {
+                "name": "ERROR_CLASS_ALREADY_ROLLED_BACK",
+                "integer": 17
+              },
+              {
+                "name": "ERROR_CLASS_UNDETERMINED",
+                "integer": 18
+              },
+              {
+                "name": "ERROR_CLASS_INTERNAL",
+                "integer": 19
+              }
+            ]
+          },
+          {
+            "name": "CommitDecision",
+            "enum_fields": [
+              {
+                "name": "COMMIT_DECISION_UNSPECIFIED"
+              },
+              {
+                "name": "COMMIT_DECISION_ONE_PC",
+                "integer": 1
+              },
+              {
+                "name": "COMMIT_DECISION_ASYNC_COMMIT",
+                "integer": 2
+              },
+              {
+                "name": "COMMIT_DECISION_TWO_PC",
+                "integer": 3
+              },
+              {
+                "name": "COMMIT_DECISION_ROLLBACK",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "TransactionState",
+            "enum_fields": [
+              {
+                "name": "TRANSACTION_STATE_UNSPECIFIED"
+              },
+              {
+                "name": "TRANSACTION_STATE_NEW",
+                "integer": 1
+              },
+              {
+                "name": "TRANSACTION_STATE_ACTIVE",
+                "integer": 2
+              },
+              {
+                "name": "TRANSACTION_STATE_LOCKING",
+                "integer": 3
+              },
+              {
+                "name": "TRANSACTION_STATE_PREWRITING",
+                "integer": 4
+              },
+              {
+                "name": "TRANSACTION_STATE_PREPARED",
+                "integer": 5
+              },
+              {
+                "name": "TRANSACTION_STATE_COMMITTING",
+                "integer": 6
+              },
+              {
+                "name": "TRANSACTION_STATE_COMMITTED",
+                "integer": 7
+              },
+              {
+                "name": "TRANSACTION_STATE_ROLLING_BACK",
+                "integer": 8
+              },
+              {
+                "name": "TRANSACTION_STATE_ROLLED_BACK",
+                "integer": 9
+              },
+              {
+                "name": "TRANSACTION_STATE_UNDETERMINED",
+                "integer": 10
+              },
+              {
+                "name": "TRANSACTION_STATE_REJECTED",
+                "integer": 11
+              }
+            ]
+          },
+          {
+            "name": "ParticipantState",
+            "enum_fields": [
+              {
+                "name": "PARTICIPANT_STATE_UNSPECIFIED"
+              },
+              {
+                "name": "PARTICIPANT_STATE_UNKNOWN",
+                "integer": 1
+              },
+              {
+                "name": "PARTICIPANT_STATE_ACCEPTED",
+                "integer": 2
+              },
+              {
+                "name": "PARTICIPANT_STATE_PESSIMISTIC_LOCKED",
+                "integer": 3
+              },
+              {
+                "name": "PARTICIPANT_STATE_PREWRITTEN",
+                "integer": 4
+              },
+              {
+                "name": "PARTICIPANT_STATE_COMMITTING",
+                "integer": 5
+              },
+              {
+                "name": "PARTICIPANT_STATE_COMMITTED",
+                "integer": 6
+              },
+              {
+                "name": "PARTICIPANT_STATE_ROLLING_BACK",
+                "integer": 7
+              },
+              {
+                "name": "PARTICIPANT_STATE_ROLLED_BACK",
+                "integer": 8
+              },
+              {
+                "name": "PARTICIPANT_STATE_UNDETERMINED",
+                "integer": 9
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "ProtocolVersion",
+            "fields": [
+              {
+                "id": 1,
+                "name": "major",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "minor",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "required_capabilities",
+                "type": "Capability",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "optional_capabilities",
+                "type": "Capability",
+                "is_repeated": true
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "NegotiateRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "negotiation_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "tenant_context_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "authorization_context_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 5,
+                "name": "supported_versions",
+                "type": "ProtocolVersion",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "compatibility_baseline_digest",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "NegotiateResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "negotiation_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "NegotiationStatus"
+              },
+              {
+                "id": 3,
+                "name": "selected_version",
+                "type": "ProtocolVersion"
+              },
+              {
+                "id": 4,
+                "name": "store_id",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "process_id",
+                "type": "bytes"
+              },
+              {
+                "id": 6,
+                "name": "compatibility_baseline_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "error",
+                "type": "ProtocolError"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ProtocolError",
+            "fields": [
+              {
+                "id": 1,
+                "name": "error_class",
+                "type": "ErrorClass"
+              },
+              {
+                "id": 2,
+                "name": "retry_directive",
+                "type": "RetryDirective"
+              },
+              {
+                "id": 3,
+                "name": "certainty",
+                "type": "ResultCertainty"
+              },
+              {
+                "id": 4,
+                "name": "conflict_start_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "min_commit_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "retry_after_ms",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "deadlock_key_hash",
+                "type": "uint64"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ParticipantRequestHeader",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "ProtocolVersion"
+              },
+              {
+                "id": 2,
+                "name": "negotiation_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "request_id",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "command_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 6,
+                "name": "start_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "coordinator_id",
+                "type": "bytes"
+              },
+              {
+                "id": 8,
+                "name": "logical_participant_id",
+                "type": "bytes"
+              },
+              {
+                "id": 9,
+                "name": "participant_set_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 10,
+                "name": "context_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 11,
+                "name": "payload_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 12,
+                "name": "mutation_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 13,
+                "name": "command_kind",
+                "type": "CommandKind"
+              },
+              {
+                "id": 14,
+                "name": "deadline_unix_ms",
+                "type": "uint64"
+              },
+              {
+                "id": 15,
+                "name": "cancellation_generation",
+                "type": "uint64"
+              },
+              {
+                "id": 16,
+                "name": "attempt",
+                "type": "uint32"
+              },
+              {
+                "id": 17,
+                "name": "payload_length",
+                "type": "uint32"
+              },
+              {
+                "id": 18,
+                "name": "authorization_context_digest",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ParticipantRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ParticipantRequestHeader"
+              },
+              {
+                "id": 2,
+                "name": "payload",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ParticipantResponseHeader",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "ProtocolVersion"
+              },
+              {
+                "id": 2,
+                "name": "request_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "command_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "command_kind",
+                "type": "CommandKind"
+              },
+              {
+                "id": 5,
+                "name": "request_payload_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 6,
+                "name": "response_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "mutation_effect",
+                "type": "MutationEffect"
+              },
+              {
+                "id": 8,
+                "name": "certainty",
+                "type": "ResultCertainty"
+              },
+              {
+                "id": 9,
+                "name": "error",
+                "type": "ProtocolError"
+              },
+              {
+                "id": 10,
+                "name": "applied_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "payload_length",
+                "type": "uint32"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ParticipantResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "header",
+                "type": "ParticipantResponseHeader"
+              },
+              {
+                "id": 2,
+                "name": "payload",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "TransactionRecordV1",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "ProtocolVersion"
+              },
+              {
+                "id": 2,
+                "name": "record_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 4,
+                "name": "start_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "coordinator_id",
+                "type": "bytes"
+              },
+              {
+                "id": 6,
+                "name": "context_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "participant_set_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 8,
+                "name": "primary_participant_id",
+                "type": "bytes"
+              },
+              {
+                "id": 9,
+                "name": "primary_key",
+                "type": "bytes"
+              },
+              {
+                "id": 10,
+                "name": "decision",
+                "type": "CommitDecision"
+              },
+              {
+                "id": 11,
+                "name": "state",
+                "type": "TransactionState"
+              },
+              {
+                "id": 12,
+                "name": "commit_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 13,
+                "name": "min_commit_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 14,
+                "name": "lock_ttl_ms",
+                "type": "uint64"
+              },
+              {
+                "id": 15,
+                "name": "last_command_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 16,
+                "name": "mutation_count",
+                "type": "uint32"
+              },
+              {
+                "id": 17,
+                "name": "mutation_bytes",
+                "type": "uint64"
+              },
+              {
+                "id": 18,
+                "name": "certainty",
+                "type": "ResultCertainty"
+              },
+              {
+                "id": 19,
+                "name": "semantic_digest",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ParticipantRecordV1",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "ProtocolVersion"
+              },
+              {
+                "id": 2,
+                "name": "record_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 4,
+                "name": "start_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "coordinator_id",
+                "type": "bytes"
+              },
+              {
+                "id": 6,
+                "name": "logical_participant_id",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "logical_key_set_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 8,
+                "name": "region_id",
+                "type": "uint64"
+              },
+              {
+                "id": 9,
+                "name": "region_conf_ver",
+                "type": "uint64"
+              },
+              {
+                "id": 10,
+                "name": "region_version",
+                "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "authority_generation",
+                "type": "uint64"
+              },
+              {
+                "id": 12,
+                "name": "state",
+                "type": "ParticipantState"
+              },
+              {
+                "id": 13,
+                "name": "mutation_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 14,
+                "name": "last_request_id",
+                "type": "bytes"
+              },
+              {
+                "id": 15,
+                "name": "last_command_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 16,
+                "name": "lock_ttl_ms",
+                "type": "uint64"
+              },
+              {
+                "id": 17,
+                "name": "decision",
+                "type": "CommitDecision"
+              },
+              {
+                "id": 18,
+                "name": "last_effect",
+                "type": "MutationEffect"
+              },
+              {
+                "id": 19,
+                "name": "certainty",
+                "type": "ResultCertainty"
+              },
+              {
+                "id": 20,
+                "name": "retry_directive",
+                "type": "RetryDirective"
+              },
+              {
+                "id": 21,
+                "name": "semantic_digest",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100
+            ]
+          },
+          {
+            "name": "ReplayReceiptV1",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "ProtocolVersion"
+              },
+              {
+                "id": 2,
+                "name": "record_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "keyspace_id",
+                "type": "uint32"
+              },
+              {
+                "id": 4,
+                "name": "start_ts",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "coordinator_id",
+                "type": "bytes"
+              },
+              {
+                "id": 6,
+                "name": "logical_participant_id",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "request_id",
+                "type": "bytes"
+              },
+              {
+                "id": 8,
+                "name": "command_kind",
+                "type": "CommandKind"
+              },
+              {
+                "id": 9,
+                "name": "command_sequence",
+                "type": "uint64"
+              },
+              {
+                "id": 10,
+                "name": "payload_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 11,
+                "name": "context_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 12,
+                "name": "mutation_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 13,
+                "name": "response_digest",
+                "type": "bytes"
+              },
+              {
+                "id": 14,
+                "name": "mutation_effect",
+                "type": "MutationEffect"
+              },
+              {
+                "id": 15,
+                "name": "certainty",
+                "type": "ResultCertainty"
+              },
+              {
+                "id": 16,
+                "name": "retention_deadline_unix_ms",
+                "type": "uint64"
+              },
+              {
+                "id": 17,
+                "name": "semantic_digest",
+                "type": "bytes"
+              }
+            ],
+            "reserved_ids": [
+              100,
+              101,
+              102,
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              119,
+              120,
+              121,
+              122,
+              123,
+              124,
+              125,
+              126,
+              127,
+              128,
+              129,
+              130,
+              131,
+              132,
+              133,
+              134,
+              135,
+              136,
+              137,
+              138,
+              139,
+              140,
+              141,
+              142,
+              143,
+              144,
+              145,
+              146,
+              147,
+              148,
+              149,
+              150,
+              151,
+              152,
+              153,
+              154,
+              155,
+              156,
+              157,
+              158,
+              159,
+              160,
+              161,
+              162,
+              163,
+              164,
+              165,
+              166,
+              167,
+              168,
+              169,
+              170,
+              171,
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              180,
+              181,
+              182,
+              183,
+              184,
+              185,
+              186,
+              187,
+              188,
+              189,
+              190,
+              191,
+              192,
+              193,
+              194,
+              195,
+              196,
+              197,
+              198,
+              199
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "gogoproto/gogo.proto"
+          },
+          {
+            "path": "rustproto.proto"
+          }
+        ],
+        "package": {
+          "name": "txn_protocolpb"
         },
         "options": [
           {

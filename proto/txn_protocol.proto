@@ -1,0 +1,314 @@
+syntax = "proto3";
+package txn_protocolpb;
+
+import "gogoproto/gogo.proto";
+import "rustproto.proto";
+
+option java_package = "org.tikv.kvproto";
+option (gogoproto.goproto_sizecache_all) = false;
+option (gogoproto.goproto_unkeyed_all) = false;
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (rustproto.lite_runtime_all) = true;
+
+// Capability names are stable wire values. Unknown required capabilities must
+// be rejected before a participant mutation is decoded or executed.
+enum Capability {
+  PROTOCOL_CAPABILITY_UNSPECIFIED = 0;
+  PROTOCOL_CAPABILITY_SNAPSHOT_READ = 1;
+  PROTOCOL_CAPABILITY_OPTIMISTIC = 2;
+  PROTOCOL_CAPABILITY_PESSIMISTIC = 3;
+  PROTOCOL_CAPABILITY_ONE_PC = 4;
+  PROTOCOL_CAPABILITY_ASYNC_COMMIT = 5;
+  PROTOCOL_CAPABILITY_TWO_PC = 6;
+  PROTOCOL_CAPABILITY_LOCK_RESOLUTION = 7;
+  PROTOCOL_CAPABILITY_CHECK_TXN_STATUS_MUTATION = 8;
+  PROTOCOL_CAPABILITY_VERSIONED_RECOVERY = 9;
+}
+
+message ProtocolVersion {
+  uint32 major = 1;
+  uint32 minor = 2;
+  repeated Capability required_capabilities = 3;
+  repeated Capability optional_capabilities = 4;
+
+  reserved 100;
+}
+
+enum NegotiationStatus {
+  NEGOTIATION_STATUS_UNSPECIFIED = 0;
+  NEGOTIATION_STATUS_ACCEPTED = 1;
+  NEGOTIATION_STATUS_UNSUPPORTED_VERSION = 2;
+  NEGOTIATION_STATUS_MISSING_CAPABILITY = 3;
+  NEGOTIATION_STATUS_CONTEXT_MISMATCH = 4;
+  NEGOTIATION_STATUS_UNAUTHORIZED = 5;
+  NEGOTIATION_STATUS_RESOURCE_EXHAUSTED = 6;
+}
+
+message NegotiateRequest {
+  // Exactly 16 opaque bytes. Retries reuse the same ID.
+  bytes negotiation_id = 1;
+  uint32 keyspace_id = 2;
+  bytes tenant_context_digest = 3;
+  bytes authorization_context_digest = 4;
+  repeated ProtocolVersion supported_versions = 5;
+  bytes compatibility_baseline_digest = 6;
+
+  reserved 100;
+}
+
+message NegotiateResponse {
+  bytes negotiation_id = 1;
+  NegotiationStatus status = 2;
+  ProtocolVersion selected_version = 3;
+  uint64 store_id = 4;
+  // Exactly 16 opaque bytes and regenerated on every process start.
+  bytes process_id = 5;
+  bytes compatibility_baseline_digest = 6;
+  ProtocolError error = 7;
+
+  reserved 100;
+}
+
+enum CommandKind {
+  COMMAND_KIND_UNSPECIFIED = 0;
+  COMMAND_KIND_SNAPSHOT_GET = 1;
+  COMMAND_KIND_SNAPSHOT_SCAN = 2;
+  COMMAND_KIND_PESSIMISTIC_LOCK = 3;
+  COMMAND_KIND_PESSIMISTIC_ROLLBACK = 4;
+  COMMAND_KIND_PREWRITE = 5;
+  COMMAND_KIND_COMMIT = 6;
+  COMMAND_KIND_BATCH_ROLLBACK = 7;
+  COMMAND_KIND_TXN_HEART_BEAT = 8;
+  COMMAND_KIND_CHECK_TXN_STATUS = 9;
+  COMMAND_KIND_CHECK_SECONDARY_LOCKS = 10;
+  COMMAND_KIND_RESOLVE_LOCK = 11;
+}
+
+enum MutationEffect {
+  MUTATION_EFFECT_UNSPECIFIED = 0;
+  MUTATION_EFFECT_NOT_APPLIED = 1;
+  MUTATION_EFFECT_APPLIED = 2;
+  MUTATION_EFFECT_UNDETERMINED = 3;
+}
+
+enum ResultCertainty {
+  RESULT_CERTAINTY_UNSPECIFIED = 0;
+  RESULT_CERTAINTY_DEFINITIVE = 1;
+  RESULT_CERTAINTY_RETRYABLE = 2;
+  RESULT_CERTAINTY_UNDETERMINED = 3;
+}
+
+enum RetryDirective {
+  RETRY_DIRECTIVE_UNSPECIFIED = 0;
+  RETRY_DIRECTIVE_NEVER = 1;
+  RETRY_DIRECTIVE_SAME_REQUEST = 2;
+  RETRY_DIRECTIVE_REFRESH_ROUTE = 3;
+  RETRY_DIRECTIVE_RESOLVE_LOCK = 4;
+  RETRY_DIRECTIVE_TRANSACTION = 5;
+  RETRY_DIRECTIVE_CHECK_STATUS = 6;
+}
+
+enum ErrorClass {
+  ERROR_CLASS_UNSPECIFIED = 0;
+  ERROR_CLASS_INVALID_PROTOCOL = 1;
+  ERROR_CLASS_UNAUTHORIZED = 2;
+  ERROR_CLASS_RESOURCE_EXHAUSTED = 3;
+  ERROR_CLASS_CANCELLED = 4;
+  ERROR_CLASS_DEADLINE_EXCEEDED = 5;
+  ERROR_CLASS_REGION_STALE = 6;
+  ERROR_CLASS_NOT_LEADER = 7;
+  ERROR_CLASS_UNAVAILABLE = 8;
+  ERROR_CLASS_KEY_LOCKED = 9;
+  ERROR_CLASS_WRITE_CONFLICT = 10;
+  ERROR_CLASS_DEADLOCK = 11;
+  ERROR_CLASS_LOCK_TIMEOUT = 12;
+  ERROR_CLASS_DUPLICATE_KEY = 13;
+  ERROR_CLASS_ASSERTION_FAILED = 14;
+  ERROR_CLASS_TXN_NOT_FOUND = 15;
+  ERROR_CLASS_ALREADY_COMMITTED = 16;
+  ERROR_CLASS_ALREADY_ROLLED_BACK = 17;
+  ERROR_CLASS_UNDETERMINED = 18;
+  ERROR_CLASS_INTERNAL = 19;
+}
+
+message ProtocolError {
+  ErrorClass error_class = 1;
+  RetryDirective retry_directive = 2;
+  ResultCertainty certainty = 3;
+  uint64 conflict_start_ts = 4;
+  uint64 min_commit_ts = 5;
+  uint64 retry_after_ms = 6;
+  uint64 deadlock_key_hash = 7;
+
+  reserved 100;
+}
+
+message ParticipantRequestHeader {
+  ProtocolVersion version = 1;
+  bytes negotiation_id = 2;
+  bytes request_id = 3;
+  uint64 command_sequence = 4;
+  uint32 keyspace_id = 5;
+  uint64 start_ts = 6;
+  bytes coordinator_id = 7;
+  bytes logical_participant_id = 8;
+  bytes participant_set_digest = 9;
+  bytes context_digest = 10;
+  bytes payload_digest = 11;
+  bytes mutation_digest = 12;
+  CommandKind command_kind = 13;
+  uint64 deadline_unix_ms = 14;
+  uint64 cancellation_generation = 15;
+  uint32 attempt = 16;
+  uint32 payload_length = 17;
+  bytes authorization_context_digest = 18;
+
+  reserved 100;
+}
+
+message ParticipantRequest {
+  ParticipantRequestHeader header = 1;
+  // A serialized kvrpcpb request selected by header.command_kind. The server
+  // validates the outer header before decoding this bounded payload.
+  bytes payload = 2;
+
+  reserved 100;
+}
+
+message ParticipantResponseHeader {
+  ProtocolVersion version = 1;
+  bytes request_id = 2;
+  uint64 command_sequence = 3;
+  CommandKind command_kind = 4;
+  bytes request_payload_digest = 5;
+  bytes response_digest = 6;
+  MutationEffect mutation_effect = 7;
+  ResultCertainty certainty = 8;
+  ProtocolError error = 9;
+  uint64 applied_sequence = 10;
+  uint32 payload_length = 11;
+
+  reserved 100;
+}
+
+message ParticipantResponse {
+  ParticipantResponseHeader header = 1;
+  // A serialized kvrpcpb response matching header.command_kind. Error-only
+  // responses may leave payload empty.
+  bytes payload = 2;
+
+  reserved 100;
+}
+
+enum CommitDecision {
+  COMMIT_DECISION_UNSPECIFIED = 0;
+  COMMIT_DECISION_ONE_PC = 1;
+  COMMIT_DECISION_ASYNC_COMMIT = 2;
+  COMMIT_DECISION_TWO_PC = 3;
+  COMMIT_DECISION_ROLLBACK = 4;
+}
+
+enum TransactionState {
+  TRANSACTION_STATE_UNSPECIFIED = 0;
+  TRANSACTION_STATE_NEW = 1;
+  TRANSACTION_STATE_ACTIVE = 2;
+  TRANSACTION_STATE_LOCKING = 3;
+  TRANSACTION_STATE_PREWRITING = 4;
+  TRANSACTION_STATE_PREPARED = 5;
+  TRANSACTION_STATE_COMMITTING = 6;
+  TRANSACTION_STATE_COMMITTED = 7;
+  TRANSACTION_STATE_ROLLING_BACK = 8;
+  TRANSACTION_STATE_ROLLED_BACK = 9;
+  TRANSACTION_STATE_UNDETERMINED = 10;
+  TRANSACTION_STATE_REJECTED = 11;
+}
+
+enum ParticipantState {
+  PARTICIPANT_STATE_UNSPECIFIED = 0;
+  PARTICIPANT_STATE_UNKNOWN = 1;
+  PARTICIPANT_STATE_ACCEPTED = 2;
+  PARTICIPANT_STATE_PESSIMISTIC_LOCKED = 3;
+  PARTICIPANT_STATE_PREWRITTEN = 4;
+  PARTICIPANT_STATE_COMMITTING = 5;
+  PARTICIPANT_STATE_COMMITTED = 6;
+  PARTICIPANT_STATE_ROLLING_BACK = 7;
+  PARTICIPANT_STATE_ROLLED_BACK = 8;
+  PARTICIPANT_STATE_UNDETERMINED = 9;
+}
+
+message TransactionRecordV1 {
+  ProtocolVersion version = 1;
+  uint64 record_sequence = 2;
+  uint32 keyspace_id = 3;
+  uint64 start_ts = 4;
+  bytes coordinator_id = 5;
+  bytes context_digest = 6;
+  bytes participant_set_digest = 7;
+  bytes primary_participant_id = 8;
+  // Sensitive recovery bytes. Never expose through Debug, logs, metrics, or
+  // public diagnostics.
+  bytes primary_key = 9;
+  CommitDecision decision = 10;
+  TransactionState state = 11;
+  uint64 commit_ts = 12;
+  uint64 min_commit_ts = 13;
+  uint64 lock_ttl_ms = 14;
+  uint64 last_command_sequence = 15;
+  uint32 mutation_count = 16;
+  uint64 mutation_bytes = 17;
+  ResultCertainty certainty = 18;
+  bytes semantic_digest = 19;
+
+  reserved 100;
+}
+
+message ParticipantRecordV1 {
+  ProtocolVersion version = 1;
+  uint64 record_sequence = 2;
+  uint32 keyspace_id = 3;
+  uint64 start_ts = 4;
+  bytes coordinator_id = 5;
+  bytes logical_participant_id = 6;
+  bytes logical_key_set_digest = 7;
+  uint64 region_id = 8;
+  uint64 region_conf_ver = 9;
+  uint64 region_version = 10;
+  uint64 authority_generation = 11;
+  ParticipantState state = 12;
+  bytes mutation_digest = 13;
+  bytes last_request_id = 14;
+  uint64 last_command_sequence = 15;
+  uint64 lock_ttl_ms = 16;
+  CommitDecision decision = 17;
+  MutationEffect last_effect = 18;
+  ResultCertainty certainty = 19;
+  RetryDirective retry_directive = 20;
+  bytes semantic_digest = 21;
+
+  reserved 100;
+}
+
+message ReplayReceiptV1 {
+  ProtocolVersion version = 1;
+  uint64 record_sequence = 2;
+  uint32 keyspace_id = 3;
+  uint64 start_ts = 4;
+  bytes coordinator_id = 5;
+  bytes logical_participant_id = 6;
+  bytes request_id = 7;
+  CommandKind command_kind = 8;
+  uint64 command_sequence = 9;
+  bytes payload_digest = 10;
+  bytes context_digest = 11;
+  bytes mutation_digest = 12;
+  bytes response_digest = 13;
+  MutationEffect mutation_effect = 14;
+  ResultCertainty certainty = 15;
+  uint64 retention_deadline_unix_ms = 16;
+  bytes semantic_digest = 17;
+
+  reserved 100 to 199;
+}

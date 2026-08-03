@@ -8,6 +8,7 @@ import "kvrpcpb.proto";
 import "mpp.proto";
 import "raft_serverpb.proto";
 import "rustproto.proto";
+import "txn_protocol.proto";
 
 option java_package = "org.tikv.kvproto";
 option (gogoproto.goproto_sizecache_all) = false;
@@ -20,6 +21,11 @@ option (rustproto.lite_runtime_all) = true;
 
 // Key/value store API for TiKV.
 service Tikv {
+  // Versioned CSE transaction participant protocol. An older store returns
+  // UNIMPLEMENTED before any transaction mutation can be decoded or applied.
+  rpc TxnProtocolNegotiate(txn_protocolpb.NegotiateRequest) returns (txn_protocolpb.NegotiateResponse) {}
+  rpc TxnParticipant(txn_protocolpb.ParticipantRequest) returns (txn_protocolpb.ParticipantResponse) {}
+
   // Commands using a transactional interface.
   rpc KvGet(kvrpcpb.GetRequest) returns (kvrpcpb.GetResponse) {}
   rpc KvScan(kvrpcpb.ScanRequest) returns (kvrpcpb.ScanResponse) {}
